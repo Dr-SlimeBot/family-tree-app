@@ -261,8 +261,8 @@ export default function App() {
     setMembers((p) => [...p, { id: uid(), ...data }]);
     memberCntRef.current += 1;
     setModal(null);
+    setModal(null);
     flash("🌿 Added to your forest!");
-    if (isFirst) setTimeout(() => { setOffset({ x: 0, y: 0 }); setZoom(1); }, 80);
   }, [flash]);
 
   const editMember = useCallback((data) => {
@@ -304,29 +304,6 @@ export default function App() {
   }, []);
 
   const endDrag = useCallback(() => { dragging.current = false; }, []);
-
-  // ── Drag — touch ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    let touchId = null, sx = 0, sy = 0, ox = 0, oy = 0;
-    function onTouchStart(e) {
-      if (e.touches.length !== 1) return;
-      const t = e.touches[0]; touchId = t.identifier; sx = t.clientX; sy = t.clientY;
-      dragMoved.current = false;
-      setOffset((prev) => { ox = prev.x; oy = prev.y; return prev; });
-    }
-    function onTouchMove(e) {
-      if (e.touches.length !== 1) return;
-      const t = Array.from(e.touches).find((tt) => tt.identifier === touchId);
-      if (!t) return;
-      const dx = t.clientX - sx, dy = t.clientY - sy;
-      if (Math.hypot(dx, dy) > 8) { dragMoved.current = true; e.preventDefault(); setOffset({ x: ox + dx, y: oy + dy }); }
-    }
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove",  onTouchMove,  { passive: false });
-    return () => { el.removeEventListener("touchstart", onTouchStart); el.removeEventListener("touchmove", onTouchMove); };
-  }, [canvasRef]);
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   const zoomIn   = () => { sfx("pop"); setZoom((z) => Math.min(z + 0.15, 2.5)); };
@@ -477,9 +454,10 @@ export default function App() {
       {/* ── Canvas ── */}
       <div ref={canvasRef} className="canvas-area"
         style={{ cursor: dragging.current ? "grabbing" : "grab" }}
-        onMouseDown={(e) => startDrag(e.clientX, e.clientY)}
-        onMouseMove={(e) => moveDrag(e.clientX, e.clientY)}
-        onMouseUp={endDrag} onMouseLeave={endDrag}>
+        onPointerDown={(e) => startDrag(e.clientX, e.clientY)}
+        onPointerMove={(e) => moveDrag(e.clientX, e.clientY)}
+        onPointerUp={endDrag} onPointerLeave={endDrag}
+        onPointerCancel={endDrag}>
 
         {/* Decorative background */}
         <div style={{ position:"absolute", bottom:12, right:28, fontSize:48, opacity:.08, pointerEvents:"none" }}>🌾🍄🌼</div>
