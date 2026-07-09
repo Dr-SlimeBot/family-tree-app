@@ -173,6 +173,11 @@ export default function App() {
   // Phase 1 + 3: expandedJunctions — Set of junction IDs that have been opened
   const [expandedJunctions, setExpandedJunctions] = useState(() => new Set());
 
+  // Live transform values tracked in refs so dragging never triggers React re-renders
+  const liveOffset = useRef({ x: 0, y: 0 });
+  const liveZoom   = useRef(1);
+  const wrapperRef = useRef(null); // the transformed SVG wrapper div
+
   const dragging     = useRef(false);
   const dragStart    = useRef(null);
   const dragMoved    = useRef(false);
@@ -182,7 +187,6 @@ export default function App() {
   const prevQuestPct = useRef(0);
   const hasAutoCentered = useRef(false);
 
-  usePinchZoom(canvasRef, zoom, setZoom);
 
   // ── Load ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -261,7 +265,6 @@ export default function App() {
     setMembers((p) => [...p, { id: uid(), ...data }]);
     memberCntRef.current += 1;
     setModal(null);
-    setModal(null);
     flash("🌿 Added to your forest!");
   }, [flash]);
 
@@ -290,32 +293,65 @@ export default function App() {
     });
   }, []);
 
-  // ── Drag — mouse ──────────────────────────────────────────────────────────
+  // ── Drag — GPU-composited, no React re-renders during drag ────────────────
+  const applyTransform = useCallback((ox, oy, z) => {
+    if (wrapperRef.current) {
+      wrapperRef.current.style.transform = `translate(${ox}px,${oy}px) scale(${z})`;
+    }
+  }, []);
+
+  usePinchZoom(canvasRef, liveZoom, liveOffset, applyTransform, setZoom);
+
   const startDrag = useCallback((cx, cy) => {
-    dragging.current = true; dragMoved.current = false;
-    dragStart.current = { cx, cy, ox: offset.x, oy: offset.y };
-  }, [offset]);
+    dragging.current  = true;
+    dragMoved.current = false;
+    dragStart.current = { cx, cy, ox: liveOffset.current.x, oy: liveOffset.current.y };
+  }, []);
 
   const moveDrag = useCallback((cx, cy) => {
     if (!dragging.current || !dragStart.current) return;
     const { cx: sx, cy: sy, ox, oy } = dragStart.current;
     const dx = cx - sx, dy = cy - sy;
-    if (Math.hypot(dx, dy) > 8) { dragMoved.current = true; setOffset({ x: ox + dx, y: oy + dy }); }
+    if (Math.hypot(dx, dy) > 8) {
+      dragMoved.current = true;
+      liveOffset.current = { x: ox + dx, y: oy + dy };
+      applyTransform(ox + dx, oy + dy, liveZoom.current);
+    }
+  }, [applyTransform]);
+
+  const endDrag = useCallback(() => {
+    if (dragging.current) {
+      dragging.current = false;
+      // Sync React state only when drag ends so cards render at correct pos
+      setOffset({ ...liveOffset.current });
+      setZoom(liveZoom.current);
+    }
   }, []);
 
-  const endDrag = useCallback(() => { dragging.current = false; }, []);
-
-  // ── Zoom ──────────────────────────────────────────────────────────────────
-  const zoomIn   = () => { sfx("pop"); setZoom((z) => Math.min(z + 0.15, 2.5)); };
-  const zoomOut  = () => { sfx("pop"); setZoom((z) => Math.max(z - 0.15, 0.4)); };
-  const recenter = () => { sfx("pop"); setOffset({ x: 0, y: 0 }); setZoom(1); };
+  // ── Zoom — use applyTransform so pinch is also GPU-composited ────────────
+  const zoomIn  = () => { sfx("pop"); const z = Math.min(liveZoom.current + 0.15, 2.5); liveZoom.current = z; applyTransform(liveOffset.current.x, liveOffset.current.y, z); setZoom(z); };
+  const zoomOut = () => { sfx("pop"); const z = Math.max(liveZoom.current - 0.15, 0.4); liveZoom.current = z; applyTransform(liveOffset.current.x, liveOffset.current.y, z); setZoom(z); };
+  const recenter = () => {
+    sfx("pop");
+    liveOffset.current = { x: 0, y: 0 };
+    liveZoom.current   = 1;
+    applyTransform(0, 0, 1);
+    setOffset({ x: 0, y: 0 });
+    setZoom(1);
+  };
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-    const onWheel = (e) => { e.preventDefault(); setZoom((z) => Math.min(2.5, Math.max(0.4, z - e.deltaY * 0.003))); };
+    const onWheel = (e) => {
+      e.preventDefault();
+      const z = Math.min(2.5, Math.max(0.4, liveZoom.current - e.deltaY * 0.003));
+      liveZoom.current = z;
+      applyTransform(liveOffset.current.x, liveOffset.current.y, z);
+      setZoom(z);
+    };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [canvasRef]);
+  }, [canvasRef, applyTransform]);
 
   // ── Phase 1: Card click — triggers expansion on Aunt/Uncle first selection ──
   const handleCardClick = useCallback((mem) => {
@@ -395,14 +431,16 @@ export default function App() {
     if (screen === "tree" && members?.length > 0 && !hasAutoCentered.current && svgW > 0) {
       const selfMember = members.find(m => m.role === "self");
       if (selfMember && pos[selfMember.id]) {
-        // Calculate offset to center the self node in the window
-        const cx = window.innerWidth / 2 - pos[selfMember.id].x * zoom;
-        const cy = window.innerHeight / 2 - pos[selfMember.id].y * zoom;
+        const cx = window.innerWidth  / 2 - pos[selfMember.id].x;
+        const cy = window.innerHeight / 2 - pos[selfMember.id].y;
+        liveOffset.current = { x: cx, y: cy };
+        liveZoom.current   = 1;
+        applyTransform(cx, cy, 1);
         setOffset({ x: cx, y: cy });
         hasAutoCentered.current = true;
       }
     }
-  }, [screen, members, pos, svgW, zoom]);
+  }, [screen, members, pos, svgW, applyTransform]);
 
   const hasNoSelf = !members?.some((m) => m.role === "self");
 
@@ -473,37 +511,45 @@ export default function App() {
               onClick={() => { sfx("chime"); setModal("add"); }}>🌱 Plant Myself Here!</button>
           </div>
         ) : (
-          <svg className="canvas-svg" width={svgW} height={svgH}
-            style={{ minWidth: "100%", minHeight: "100%" }}>
-            <rect width="100%" height="100%" fill="transparent" />
-            <g transform={`translate(${offset.x},${offset.y}) scale(${zoom})`}>
+          // GPU-composited wrapper — transform is applied directly via DOM ref, never via React state during drag
+          <div ref={wrapperRef}
+            style={{
+              position: "absolute", top: 0, left: 0,
+              transform: `translate(${offset.x}px,${offset.y}px) scale(${zoom})`,
+              transformOrigin: "0 0",
+              willChange: "transform",
+            }}>
+            <svg className="canvas-svg" width={svgW} height={svgH}>
+              <rect width="100%" height="100%" fill="transparent" />
+              <g>
 
-              {/* Generation row labels */}
-              <GenLabels members={visibleMembers} pos={pos} />
+                {/* Generation row labels */}
+                <GenLabels members={visibleMembers} pos={pos} />
 
-              {/* Phase 1: Junction-routed edges (rendered under cards) */}
-              <JunctionRenderer
-                junctions={junctions}
-                juncPos={juncPos}
-                edges={junctionEdges}
-                expandedJunctions={expandedJunctions}
-                onToggle={handleToggleJunction}
-              />
-
-              {/* Phase 2 + 3: Member cards — filtered to visible only */}
-              {visibleMembers.map((m) => (
-                <MemberCard
-                  key={m.id}
-                  member={m}
-                  pos={pos[m.id] || { x: CANVAS_CX, y: 800 }}
-                  isSelected={selected?.id === m.id}
-                  onCardClick={handleCardClick}
-                  labelOverride={labelOverrides[m.id]}      // Phase 3: "Bob's Kid"
-                  isJunctionOpen={isJunctionOpen(m)}         // Phase 1: glow when expanded
+                {/* Phase 1: Junction-routed edges (rendered under cards) */}
+                <JunctionRenderer
+                  junctions={junctions}
+                  juncPos={juncPos}
+                  edges={junctionEdges}
+                  expandedJunctions={expandedJunctions}
+                  onToggle={handleToggleJunction}
                 />
-              ))}
-            </g>
-          </svg>
+
+                {/* Phase 2 + 3: Member cards — filtered to visible only */}
+                {visibleMembers.map((m) => (
+                  <MemberCard
+                    key={m.id}
+                    member={m}
+                    pos={pos[m.id] || { x: CANVAS_CX, y: 800 }}
+                    isSelected={selected?.id === m.id}
+                    onCardClick={handleCardClick}
+                    labelOverride={labelOverrides[m.id]}
+                    isJunctionOpen={isJunctionOpen(m)}
+                  />
+                ))}
+              </g>
+            </svg>
+          </div>
         )}
 
         {/* Zoom controls */}
