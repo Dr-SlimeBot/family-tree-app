@@ -180,6 +180,7 @@ export default function App() {
   const toastTimer   = useRef(null);
   const memberCntRef = useRef(0);
   const prevQuestPct = useRef(0);
+  const hasAutoCentered = useRef(false);
 
   usePinchZoom(canvasRef, zoom, setZoom);
 
@@ -235,7 +236,14 @@ export default function App() {
   useEffect(() => {
     if (!members) return;
     const quest = getQuest(members);
-    if (quest.pct === 100 && prevQuestPct.current < 100) { confetti(); sfx("chime"); flash("🌈 Amazing! Quest complete! 🎉"); }
+    if (quest.pct === 100 && prevQuestPct.current < 100) { 
+      sfx("chime"); 
+      confetti();
+      setTimeout(confetti, 250);
+      setTimeout(confetti, 500);
+      setTimeout(confetti, 750);
+      flash("🏆 Master Forest Builder! 🌳"); 
+    }
     prevQuestPct.current = quest.pct;
   }, [members]); // eslint-disable-line
 
@@ -404,6 +412,20 @@ export default function App() {
   const allY = visiblePos.map((p) => p.y);
   const svgW = allX.length ? Math.max(...allX) + 340 : 1200;
   const svgH = allY.length ? Math.max(...allY) + 280 : 1100;
+
+  // ── Smart Auto-Centering ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (screen === "tree" && members?.length > 0 && !hasAutoCentered.current && svgW > 0) {
+      const selfMember = members.find(m => m.role === "self");
+      if (selfMember && pos[selfMember.id]) {
+        // Calculate offset to center the self node in the window
+        const cx = window.innerWidth / 2 - pos[selfMember.id].x * zoom;
+        const cy = window.innerHeight / 2 - pos[selfMember.id].y * zoom;
+        setOffset({ x: cx, y: cy });
+        hasAutoCentered.current = true;
+      }
+    }
+  }, [screen, members, pos, svgW, zoom]);
 
   const hasNoSelf = !members?.some((m) => m.role === "self");
 

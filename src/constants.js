@@ -201,5 +201,5 @@ export function getQuest(members) {
   if (!hasAny("aunt", "uncle"))      return { text: "🌟 Add an Aunt or Uncle!", pct: 65 };
   if (!hasAny("cousin"))             return { text: "🧑 Add a cousin!", pct: 80 };
   if (!hasAny("pet"))                return { text: "🐶 Add a pet!", pct: 90 };
-  return { text: "🌈 You built a grand family forest!", pct: 100 };
+  return { text: "You are a Master Forest Builder! 🌳🏆", pct: 100 };
 }
