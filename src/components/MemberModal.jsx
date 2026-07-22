@@ -23,15 +23,19 @@ function getAvatarCategoryForRole(r) {
   return ["Kids", "Fun"];
 }
 
-export function MemberModal({ member, allMembers, onSave, onClose, onDelete, hasNoSelf }) {
+export function MemberModal({ member, allMembers, onSave, onClose, onDelete, hasNoSelf, contextMember, contextGroups, contextLabel }) {
   const isNew = !member?.id;
-  const defaultRole = member?.role || (hasNoSelf ? "self" : "mom");
+  const defaultRole = member?.role || (hasNoSelf ? "self" : (contextGroups ? contextGroups[0]?.roles[0] : "mom") || "mom");
 
   const [step,          setStep]          = useState(hasNoSelf ? 2 : 1);
   const [name,          setName]          = useState(member?.name    || "");
   const [avatar,        setAvatar]        = useState(member?.avatar  || ROLE_DEFAULT_AVATAR[defaultRole] || "🧒");
   const [role,          setRole]          = useState(defaultRole);
-  const [parentId,      setParentId]      = useState(member?.parentId || "");
+  const [parentId,      setParentId]      = useState(
+    member?.parentId ||
+    // Pre-seed parentId from context: if adding cousin/in-law relative to an aunt/uncle
+    (contextMember && PARENT_REQUIRED_ROLES.has(defaultRole) ? contextMember.id : "")
+  );
   const [info,          setInfo]          = useState(member?.info     || "");
   const [avatarChosen,  setAvatarChosen]  = useState(!!member?.avatar);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -58,6 +62,8 @@ export function MemberModal({ member, allMembers, onSave, onClose, onDelete, has
   }, [role, eligibleParents]); // eslint-disable-line
 
   const filteredGroups = useMemo(() => {
+    // If coming from "Add Relative" button, use narrowed context groups
+    if (contextGroups) return contextGroups;
     return ROLE_GROUPS.filter((group) => {
       if (group.requiresParentRole) {
         return group.requiresParentRole.some((r) =>
@@ -66,7 +72,7 @@ export function MemberModal({ member, allMembers, onSave, onClose, onDelete, has
       }
       return true;
     });
-  }, [allMembers]);
+  }, [allMembers, contextGroups]);
 
   const needsParent   = PARENT_REQUIRED_ROLES.has(role) && eligibleParents.length > 0;
   const parentMissing = needsParent && !parentId;
@@ -163,7 +169,14 @@ export function MemberModal({ member, allMembers, onSave, onClose, onDelete, has
            {/* STEP 1: Who are they? */}
            {step === 1 && !hasNoSelf && (
              <div>
-               <h2 className="modal__title" style={{ textAlign: "center", marginBottom: 24 }}>Who are they? 🤗</h2>
+               <h2 className="modal__title" style={{ textAlign: "center", marginBottom: 8 }}>
+                 {contextLabel || "Who are they? 🤗"}
+               </h2>
+               {contextMember && (
+                 <p style={{ textAlign: "center", fontSize: 13, fontWeight: 800, color: "var(--bark)", opacity: 0.7, marginBottom: 18 }}>
+                   relative to <strong>{contextMember.name}</strong> {ROLES[contextMember.role]?.emoji}
+                 </p>
+               )}
                {filteredGroups.map(({ label, roles }) => (
                  <div key={label} className="role-group">
                    <div className="role-group__label">{label}</div>

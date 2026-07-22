@@ -203,3 +203,88 @@ export function getQuest(members) {
   if (!hasAny("pet"))                return { text: "🐶 Add a pet!", pct: 90 };
   return { text: "You are a Master Forest Builder! 🌳🏆", pct: 100 };
 }
+
+// ─── Context-aware: which roles make sense to add next to a given member ───────
+export function getRelativesOf(role) {
+  switch (role) {
+    case "self":
+      return {
+        label: "Add someone related to You",
+        groups: [
+          { label: "💆 Parents & Grandparents", roles: ["mom", "dad", "grandma", "grandpa", "great_grandma", "great_grandpa"] },
+          { label: "👪 Siblings & Partner",     roles: ["sister", "brother", "spouse"] },
+          { label: "👶 Your Children & Pets",  roles: ["daughter", "son", "pet"] },
+        ],
+      };
+    case "mom":
+    case "dad":
+      return {
+        label: `Add someone related to your ${role === "mom" ? "Mom" : "Dad"}`,
+        groups: [
+          { label: "👨‍👩 Their Parents",     roles: ["grandma", "grandpa"] },
+          { label: "👨‍👧 Their Siblings",   roles: ["aunt", "uncle"] },
+          { label: "👑 Their Partner",     roles: ["spouse"] },
+          { label: "👶 Your Siblings",    roles: ["sister", "brother"] },
+        ],
+      };
+    case "grandma":
+    case "grandpa":
+      return {
+        label: "Add someone related to your Grandparent",
+        groups: [
+          { label: "👴 Their Parents",   roles: ["great_grandma", "great_grandpa"] },
+          { label: "👨‍👧 Their Children", roles: ["mom", "dad", "aunt", "uncle"] },
+        ],
+      };
+    case "great_grandma":
+    case "great_grandpa":
+      return {
+        label: "Add someone related to your Great-Grandparent",
+        groups: [
+          { label: "👨‍👧 Their Children", roles: ["grandma", "grandpa"] },
+        ],
+      };
+    case "aunt":
+    case "uncle":
+      return {
+        label: `Add someone related to your ${role === "aunt" ? "Aunt" : "Uncle"}`,
+        groups: [
+          { label: "👠 Their Partner",  roles: [role === "aunt" ? "aunt_partner" : "uncle_partner"] },
+          { label: "👶 Their Children", roles: ["cousin"] },
+        ],
+      };
+    case "aunt_partner":
+    case "uncle_partner":
+      return {
+        label: "Add someone related to this Partner",
+        groups: [
+          { label: "👶 Their Children", roles: ["cousin"] },
+        ],
+      };
+    case "sister":
+    case "brother":
+      return {
+        label: `Add someone related to your ${role === "sister" ? "Sister" : "Brother"}`,
+        groups: [
+          { label: "👠 Their Partner",  roles: ["spouse"] },
+          { label: "👶 Their Children", roles: ["daughter", "son"] },
+        ],
+      };
+    case "spouse":
+      return {
+        label: "Add someone related to your Partner",
+        groups: [
+          { label: "👶 Your Children", roles: ["daughter", "son", "pet"] },
+        ],
+      };
+    case "cousin":
+      return {
+        label: "Add someone related to your Cousin",
+        groups: [
+          { label: "👶 Their Children", roles: ["daughter", "son"] },
+        ],
+      };
+    default:
+      return null;
+  }
+}

@@ -1,13 +1,14 @@
-import { ROLES, RELATION_EXPLAINER, BLOODLINE_ROLES, IN_LAW_ROLES } from "../constants.js";
+import { ROLES, RELATION_EXPLAINER, BLOODLINE_ROLES, IN_LAW_ROLES, getRelativesOf } from "../constants.js";
 import { sfx } from "../lib/audio.js";
 
 /**
  * explainerOverride — Phase 3: dynamic cousin relation string from cousins.js
  * relationLabel    — Phase 3: short badge label override (e.g. "Bob's Kid")
  */
-export function InfoPanel({ member, onEdit, onClose, explainerOverride, relationLabel }) {
+export function InfoPanel({ member, onEdit, onClose, onAddRelative, explainerOverride, relationLabel }) {
   const role         = ROLES[member.role] || {};
   const isInLaw      = IN_LAW_ROLES.has(member.role);
+  const relativesCtx = getRelativesOf(member.role);
 
   const getPersonalizedExplainer = () => {
     const base = explainerOverride || RELATION_EXPLAINER[member.role] || "";
@@ -71,11 +72,21 @@ export function InfoPanel({ member, onEdit, onClose, explainerOverride, relation
 
       {/* U2 fix: Edit button is now BIG, green, and the first thing you see — unmissable */}
       <div className="info-panel__actions">
+        {relativesCtx && onAddRelative && (
+          <button
+            className="btn btn--sun info-panel__edit-btn"
+            onClick={() => { sfx("pop"); onAddRelative(member, relativesCtx); }}
+            style={{ flex: 1 }}
+          >
+            ➕ Add Relative
+          </button>
+        )}
         <button
           className="btn btn--green info-panel__edit-btn"
           onClick={() => { sfx("pop"); onEdit(); }}
+          style={{ flex: 1 }}
         >
-          ✏️ Edit this Person!
+          ✏️ Edit
         </button>
         <button
           className="btn btn--ghost btn--sm"

@@ -172,6 +172,8 @@ export default function App() {
   const [tourStep,          setTourStep]          = useState(0);
   // Phase 1 + 3: expandedJunctions — Set of junction IDs that have been opened
   const [expandedJunctions, setExpandedJunctions] = useState(() => new Set());
+  // Context for "Add Relative" button: { member, groups, label }
+  const [addCtx, setAddCtx] = useState(null);
 
   // Live transform values tracked in refs so dragging never triggers React re-renders
   const liveOffset = useRef({ x: 0, y: 0 });
@@ -571,8 +573,13 @@ export default function App() {
           member={selected}
           onEdit={() => { setModal(selected); setSelected(null); }}
           onClose={() => setSelected(null)}
-          explainerOverride={explainerOverrides[selected.id]}   // Phase 3
-          relationLabel={labelOverrides[selected.id]}           // Phase 3
+          onAddRelative={(contextMember, ctx) => {
+            setAddCtx({ member: contextMember, ...ctx });
+            setModal("add");
+            setSelected(null);
+          }}
+          explainerOverride={explainerOverrides[selected.id]}
+          relationLabel={labelOverrides[selected.id]}
         />
       )}
 
@@ -607,8 +614,17 @@ export default function App() {
 
       {/* Modals */}
       {modal === "add" && (
-        <MemberModal member={null} allMembers={members} hasNoSelf={hasNoSelf}
-          onSave={addMember} onDelete={() => {}} onClose={() => setModal(null)} />
+        <MemberModal
+          member={null}
+          allMembers={members}
+          hasNoSelf={hasNoSelf}
+          contextMember={addCtx?.member || null}
+          contextGroups={addCtx?.groups || null}
+          contextLabel={addCtx?.label || null}
+          onSave={(data) => { addMember(data); setAddCtx(null); }}
+          onDelete={() => {}}
+          onClose={() => { setModal(null); setAddCtx(null); }}
+        />
       )}
       {modal && modal !== "add" && modal !== "adult" && (
         <MemberModal member={modal} allMembers={members} hasNoSelf={false}
