@@ -494,8 +494,8 @@ export default function App() {
       {/* ── Canvas ── */}
       <div ref={canvasRef} className="canvas-area"
         style={{ cursor: dragging.current ? "grabbing" : "grab" }}
-        onPointerDown={(e) => startDrag(e.clientX, e.clientY)}
-        onPointerMove={(e) => moveDrag(e.clientX, e.clientY)}
+        onPointerDown={(e) => { if (!e.isPrimary) { endDrag(); return; } startDrag(e.clientX, e.clientY); }}
+        onPointerMove={(e) => { if (!e.isPrimary) return; moveDrag(e.clientX, e.clientY); }}
         onPointerUp={endDrag} onPointerLeave={endDrag}
         onPointerCancel={endDrag}>
 
